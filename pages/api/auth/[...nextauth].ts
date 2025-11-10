@@ -9,10 +9,11 @@ import { OAuthConfig } from 'next-auth/providers';
 export const authOptions: NextAuthOptions = {
     adapter: PrismaAdapter(prisma),
     pages: {
-        signIn: '/booking/signin',
-        signOut: '/booking/signout',
+        signIn: '/signin',
+        signOut: '/signout',
 
     },
+    secret: process.env.NEXTAUTH_SECRET,
     providers: [
         AzureADProvider({
             clientId: String(process.env.AZURE_AD_CLIENT_ID),
@@ -35,23 +36,6 @@ export const authOptions: NextAuthOptions = {
             };
             session.id = user.id;
             return session
-        },
-        async redirect({ url, baseUrl }) {
-            // Respect basePath when redirecting
-            // If url is relative, use baseUrl + basePath
-            if (url.startsWith('/')) return `${baseUrl}/booking${url}`;
-            // If same origin, ensure /booking is in the path
-            try {
-                const target = new URL(url);
-                const base = new URL(baseUrl);
-                if (target.origin === base.origin) {
-                    if (!target.pathname.startsWith('/booking')) {
-                        return `${baseUrl}/booking${target.pathname}${target.search}${target.hash}`;
-                    }
-                    return url;
-                }
-            } catch {}
-            return baseUrl;
         },
         async signIn({ user, account, profile, email, credentials }) {
             const holder = await prisma.ticketHolders.findFirst({
@@ -77,19 +61,7 @@ async function getPlusOnes(sotonId: string): Promise<{ plusOnes: string[] }> {
 }
 
 export default async function auth(req: NextApiRequest, res: NextApiResponse) {
-    // Set the basePath in authOptions dynamically based on request
-    // This ensures NextAuth constructs URLs correctly
-    const protocol = req.headers['x-forwarded-proto'] || 'http';
-    const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost:3000';
-    const basePath = `/booking`;
-    
-    authOptions.pages = {
-        signIn: `${basePath}/signin`,
-        signOut: `${basePath}/signout`,
-    };
-
     // @ts-ignore
-
     (authOptions.providers[0] as OAuthConfig<AzureADProfile>).profile = async function profile(profile, tokens) {
 
         tokens.ext_expires_in = undefined;
